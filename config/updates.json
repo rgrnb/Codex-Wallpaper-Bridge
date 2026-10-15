@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "manifestUrl": null,
+  "publicKeyPem": null,
+  "checkIntervalHours": 24,
+  "maxArchiveBytes": 134217728,
+  "status": "Awaiting owner release host and signing public key; no silent installs"
+}

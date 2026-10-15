@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "we-current-source-1",
+  "automaticSceneVersions": ["2.8.0.42"],
+  "sceneWindowClass": "WPEDesktopDX11Window",
+  "sceneFormats": ["BGRA8", "RGBA8", "RGBA16_FLOAT-linear-to-SDR"],
+  "scope": "Windows x64; one unambiguous current Scene renderer on Monitor0",
+  "projectChecksRequired": true,
+  "fullFourTypeAcceptance": true,
+  "evidence": "docs/ACCEPTANCE.md",
+  "acceptanceScope": "Dynamic tested projects in two official Codex 26.1007.9446.0 windows; per-project capability checks remain required"
+}

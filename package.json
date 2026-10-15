@@ -1,0 +1,27 @@
+{
+  "name": "codex-wallpaper-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Windows Wallpaper Engine to Codex background bridge; PRD v1.0 implementation",
+  "engines": { "node": ">=22.15" },
+  "scripts": {
+    "start": "node src/main.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check": "node scripts/check.mjs",
+    "test:browser": "node scripts/browser-smoke.mjs",
+    "test:native": "node scripts/native-smoke.mjs",
+    "test:service": "node scripts/service-smoke.mjs",
+    "test:current-video": "node scripts/current-video-smoke.mjs",
+    "test:shared-video": "node scripts/shared-video-smoke.mjs",
+    "test:web": "node scripts/web-backend-smoke.mjs",
+    "test:application": "node scripts/application-backend-smoke.mjs",
+    "test:graphics": "node scripts/graphics-backend-smoke.mjs",
+    "test:scene": "node scripts/scene-backend-smoke.mjs",
+    "test:codex": "node scripts/codex-acceptance-smoke.mjs",
+    "test:managed-launch": "node scripts/managed-launch-smoke.mjs",
+    "test:install-update": "node scripts/install-update-smoke.mjs",
+    "build": "powershell.exe -NoProfile -File scripts/build.ps1",
+    "probe": "node src/main.mjs --probe"
+  }
+}

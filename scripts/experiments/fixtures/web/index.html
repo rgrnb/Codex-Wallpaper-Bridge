@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Bridge capture probe</title>
+<style>html,body,canvas{margin:0;width:100%;height:100%;overflow:hidden;background:#104060}</style>
+<canvas></canvas><script>
+  // Authored test fixture. No audio, network, user data, or external resources.
+  const canvas = document.querySelector('canvas');
+  const context = canvas.getContext('2d');
+  function draw(time) {
+    canvas.width = innerWidth; canvas.height = innerHeight;
+    context.fillStyle = `hsl(${Math.floor(time / 10) % 360} 70% 40%)`;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#ffffff';
+    context.fillRect((time / 4) % canvas.width, 20, 30, Math.max(30, canvas.height - 40));
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+</script></html>
