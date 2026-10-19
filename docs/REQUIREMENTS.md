@@ -1,32 +1,58 @@
-# PRD traceability — 2026-10-15
+# 独立壁纸需求与验收边界
 
-PRD v1.0 is authoritative. All FR-01–FR-24 have implemented production paths. The verified support set is Windows 11 x64 / Codex 26.1007.9446.0 / WE 2.8.0.42, with per-project checks. Implemented functions, executed acceptance and universal compatibility are separate claims.
+**当前生效范围：2026-10-19本机自用收尾。** 186项测试/语法与五场景实窗恢复通过；失败恢复Codex原貌，三项风险已关闭。多屏、全天、冻结旧画面和其他PRD扩展已移出门槛，发布/安装/Git提交推送暂不执行。下文179项/耐久和PRD映射保留历史及追溯意义，未验证边界不再自动成为本次待办。完成/未完成清单见[收尾记录](CLOSEOUT-0.3.0.zh-CN.md)，`fullPrdAccepted:false`保持。
 
-| FR | Implementation and executed evidence | Verification boundary |
+更新于 2026 年 10 月 19 日。用户的 nprd 改进要求优先于早期 PRD 的“跟随桌面”行为：Codex 在 Bridge 中单独选择壁纸，保留现有控制器、WinForms、CDP、捕获与更新架构，不改官方客户端文件。
+
+本文描述 **0.3.0 本机验证候选**，尚未公开发布。本轮179项测试与语法、六来源实机双窗、正常/真实最大化/还原的四区域合成/布局检查通过。3735.771秒单屏耐久完成24轮、351次双窗采样，包含9Video、4次Sheep及跨卷Scene；资源指标、14个源树保护、42个worker/36个runtime清理与环境恢复均通过。跨卷证据为D盘引擎/E盘自绘素材，不外推任意文件系统或所有跨卷项目。历史32项非Video矩阵、685秒记录、旧候选及0.2.4保留；新包验证见[收尾记录](CLOSEOUT-0.3.0.zh-CN.md)。**完整PRD仍有下述边界，`fullPrdAccepted`继续为false。**
+
+## 当前范围
+
+| 需求 | 当前实现与已执行证据 | 尚未完成的边界 |
 | --- | --- | --- |
-| 01 | Authoritative WE current query through ConPTY; exact selected-profile/monitor fallback | No independent wallpaper library or persistent source override |
-| 02 | One owned full-window canvas; sidebar/main/composer transparency verified in two real Codex windows | Additional app panels remain subject to structural contract |
-| 03 | Centered aspect-preserving Cover; resize; authored light/dark DPR 1/1.25/1.5/2 checks passed | Physical movement across different-DPI monitors not exercised |
-| 04 | Video/Web/Scene/Application production coordinator switches all four in two real Codex windows | Verified projects/interfaces listed in NON_VIDEO_PROTOTYPE.md; arbitrary projects unverified |
-| 05 | Source/property/resource fingerprints, current-project watcher, bounded polling, generation-fenced commit | Rapid obsolete-load and source-before-renderer tests passed; long playlist stress remains |
-| 06 | Reference/range reads and in-memory frames only; no resource copies/library | Own Codex profile is not scanned/exported; browser transient profile cleaned |
-| 07 | Opt-in current-user startup, metadata discovery, waiting/reconnect, explicit official connection-mode launch | Startup enable/disable tested; managed launch keeps existing Codex and survives Bridge exit |
-| 08 | Tray, independent settings, enable/restore/export/exit, close-to-tray | Native UI construction and service exit passed |
-| 09 | Three modes, FPS cap, load-based adjustment preserving spatial quality, hidden pause, source/frame sharing | Native Video retains original source/display pixels; image budgets documented; performance record in ACCEPTANCE.md |
-| 10 | Four bounded effects, reset defaults, atomic preferences/previous copy | Real Codex effects and persisted preference recovery passed |
-| 11 | Background-only effects; no foreground/font/layout/event-handler writes; canvas input-transparent | Actual structure/layout/owned-input and synthetic click/light/dark tests passed; no user conversation inspected |
-| 12 | Independent window attach/detach; discovery/configure/frame close-race isolation; no window-count FPS penalty | Two real windows verified; four-window hardware stress not claimed |
-| 13 | Muted native video; Web startup mute; Scene/Application transfer only pixels, create no audio playback | WE properties restored/unchanged; audible sample matrix for every third-party project not claimed |
-| 14 | Removal-based restore, 15–18s page lease, six bounded retries, compatibility fencing, changed-environment recovery | Delayed attach/frame cancellation, live lease expiry and signed-update failure recovery passed |
-| 15 | Windows x64 | Tested Windows 11 build 26200; no universal OS/GPU/driver claim |
-| 16 | Owned runtime/CSS only, exact source-window scope; no official-file rollback overwrite | Repeated apply/restore, controller-death lease and graphics helper-death unload passed |
-| 17 | Full source/build/tests/config/docs/licenses and separate source archive | Source archive extracted into a new directory with spaces and compiled successfully |
-| 18 | Current-user Setup, Start menu, optional desktop/startup, bundled runtime, stable launcher, uninstall | Installed with unprivileged token; PATH without development tools; unknown-file preservation passed; no separate clean Windows account |
-| 19 | Default Normal structured lifecycle/source/connection/background/error events with correlation ID | Event ID independent of context reason; duplicate suppression and bounds tested |
-| 20 | Advanced Debug app/window/adapter/source/load/module/recovery, safe stack locations, CPU/RSS/handles/decoder/FPS, export | GPU explicitly unavailable; no fabricated metrics; exports exclude private app/profile content |
-| 21 | Auto-check/notify, configurable trusted feed, confirmed download/install, Ed25519/HTTPS/hash/size, restart/health/rollback | Successful signed activation and intentionally broken activation rollback passed; public feed/signing identity is an owner release decision |
-| 22 | Package/runtime versions separate; exact verified adapter plus per-window structure | Unknown version or incompatible structure safely waits; candidate opt-in is explicit |
-| 23 | WE version/type/resource/properties/window capability checks; versioned Scene gate | Project compatibility separate from application compatibility; unsupported APIs/windows fail clearly |
-| 24 | Ordinary asInvoker operation, no silent elevation, scoped metadata, credential-property rejection, filtered export | Current process is not elevated; no advanced elevation operation is implemented or needed |
+| 整窗连续背景与聊天交互 | 一张整窗画布，Cover/构图/背景效果；保留输入框、选中态与官方事件处理；当前Codex26.1013.4894.0五来源实体双窗及自有输入标记/清空、重载/关闭一窗通过 | 使用独立空profile；不访问用户已有聊天，跨屏与已有对话的完整视觉布局未验 |
+| 独立库与选择 | 读取Steam多库、Workshop、本地和内置项目，识别scene.pkg；选择不调用桌面同步，每项目保存构图/属性。29Scene/2Web/1Sheep矩阵和9个Video客户端原始解码均通过 | 任意第三方项目兼容性仍未证明 |
+| 视频与静音 | 原文件由 Codex Chromium 解码，赋 `src` 前静音，保留原尺寸 | 不以 JPEG 截图替代正常 Video；不承诺来源达到 60/120 FPS |
+| Scene 独立播放 | 已核验WE2.8.0.42 x64启动前私有禁声；29个Scene产生383个私有缓存的历史矩阵保留。跨卷自绘Scene已通过当前Codex双窗，原内容/metadata保持，engine/view均清理 | 跨卷视图位于素材父目录，需可写且支持硬链接；未知引擎拒绝，任意Workshop/GPU/文件系统兼容未证明 |
+| Web 与真实接口 | 私有 WE 保留原生接口；隔离静音 Edge 提供真实 WASAPI 频谱、GSMTC 媒体、文件/目录、随机文件、目录变更及 FPS/暂停回调 | 未覆盖的作者/硬件接口仍明确不可用；不伪造数据来满足能力声明 |
+| Application | 审核Sheep / Unity2017.2.0f3启动前私有禁声，640×360及5次真实点击定向通过，原光标/前台/source/config保留。统一构建动态/音频、实体双窗、4次耐久切换和隐藏重建通过 | 仅限审核Sheep；未知应用拒绝，不能扩展为任意Application支持 |
+| 鼠标交互 | 可信移动/左键点击按构图逆映射；Scene、Web 与审核 Sheep 均有定向实测。Web 文档证明来自私有 world；Sheep 使用私有轮询输入，正确坐标的 WM-only 对照 `eba2ccd6` 仅增加 12 像素且无新羊 | 不传键盘/拖拽/修饰键，不操纵系统光标/用户焦点，不使用激活通知。定向成功不能替代最终构建与真实 Codex 双窗回归 |
+| 参数与文件授权 | 通用属性编辑及每项目保存；文件/目录只接受显式选择，保存时核对存在和类型，作者默认路径不授予外部访问 | 未逐项证明所有壁纸作者参数的效果；界面 fixture 不等于系统文件选择器验收 |
+| 管理界面与 DPI | 96 DPI 虚拟化和本机实际 144 DPI 各 126 项 fixture 与屏幕实拍通过，含新后端状态、路径编辑器、性能/FPS、最小窗口布局 | 本机仅一个物理显示器，不将模拟 DPI 称作跨屏验证 |
+| 帧率、多窗口与恢复 | 30/60/120/自动上限，默认60；V5二进制响应保持画质预算。3735.771秒/24轮/351采样资源gate通过，含9Video、4次Sheep、跨卷Scene、双隐藏重建、重载及关闭一窗 | 帧率为上限；一小时不等于全天稳定、零泄漏或跨物理显示器证明 |
+| 环境与原资源 | 不发桌面全局静音/暂停/更换壁纸；自有 Job、路径/创建时间/HWND 校验；环境 wrapper 按实际设置基线核对恢复 | 必须同时验证原素材、原桌面配置、worker 与运行目录；不能只看 session/surface 已清空 |
+| 发布与卸载 | 本轮候选采用相同已验native八产物；186源码/82运行条目的首轮清单与内容SHA匹配，生产卸载/锁定失败/用户文件保留/重复卸载通过。最终源码含空格路径x64+x86构建及归档复验结果见开发记录 | 未公开发布；开发构建需i686编译器。旧候选和0.2.4保留，干净账户/任意机器安装不作全量证明 |
 
-The implementation does not remove a required type. Remaining acceptance expansion includes physical multi-monitor DPI, separate clean-account reproduction, audio-bearing third-party project combinations and longer 1/2/4-window endurance. These are documented limits, so the runtime's fullPrdAccepted flag remains false until the broader DoD has evidence. Current functional completion must not be presented as universal compatibility or full PRD acceptance.
+当前执行日志与剩余项见 [收尾记录](CLOSEOUT-0.3.0.zh-CN.md)。历史执行记录见 [ACCEPTANCE.md](ACCEPTANCE.md) 和 [中文验收记录](ACCEPTANCE.zh-CN.md)；引用其中结果必须同时保留版本、项目和后端范围。
+
+## 必须保持的技术决策
+
+1. Codex 选择与桌面选择独立。不导入桌面项目作为首次默认值，不通过全局静音或暂停满足独立运行。
+2. Video 使用原始文件和客户端原生解码；Scene/原生 Web 使用启动前禁声的私有 WE。启动后才静音或未发现音频会话都不能替代启动配置证明。
+3. Sheep 是审核特例：其原内容含音效，不能称为天然无声。音频修改只作用于已核验私有副本，未知应用保持拒绝。
+4. 身份核验覆盖 token、Job、路径、创建时间、HWND 和文档代次。不能只凭 PID、标题、空会话或作者可改写的 page-world 方法判断所有权。
+5. 文件/目录访问来自用户明确授权。测试只使用自有 fixture、空测试配置与独立证据目录，不扫描聊天或读取用户工作文件。
+6. 保留既定默认：背景/自启动关闭，opacity/brightness/contrast 为 1、blur 为 0，默认 60 FPS；平衡/画质允许的 120 FPS 是上限。
+7. 新版结论必须由当前源码、实际构建和运行证据支持；失败证据保留。单测、库扫描和 UI fixture 不能替代播放、静音、输入、耐久和发行包检查。
+
+## 原 PRD 编号追溯
+
+下表保留 FR-01–FR-24 的追溯关系。原“当前桌面/Monitor0”选择与既有 Application 桌面窗口捕获已被独立来源方案替代，早期的“全部 FR 已实现”不能当作当前全量验收结论。
+
+| 原编号 | 当前承接点 | 验收边界 |
+| --- | --- | --- |
+| FR-01、05、06 | 独立库/项目选择、属性与资源指纹、watcher/轮询、代次取消 | 引擎依赖可私有 staging；素材引用和缓存写入隔离另行核验，不能沿用旧“不复制资源”绝对描述 |
+| FR-02、03、10、11 | 整窗画布、Cover、构图、背景效果、前景事件保留 | 单显示器；页面/DPI fixture 与物理客户端检查分别记载 |
+| FR-04、13、23 | Video、Scene、原生/兼容 Web、审核 Sheep 的分类型播放及静音检查 | 支持集合按引擎/应用版本、项目和接口限定；未知应用不纳入已完成 |
+| FR-07、08、12 | 显式连接启动、托盘/独立设置、多窗口接入与退出 | 登录资料不复制；当前版本双窗与关闭竞态仍需运行证据 |
+| FR-09、20 | 性能模式/FPS 上限、真实负载和进程指标、Debug 导出 | 实际帧率单独测量；GPU 等不可用指标不得伪造 |
+| FR-14、16 | 有效来源切换可渐变；失败恢复Codex原貌、有界重试、页面租约、owned Job/目录清理 | 停止超时保留身份/资源并报错；不要求冻结旧画面；清理须校验worker/目录及原资源 |
+| FR-15、24 | Windows x64、普通用户运行、受限元数据/资源访问；32 位输入 helper 已用于审核 Sheep 定向实测 | 不承诺任意 Windows/GPU/驱动；最终构建与发行包仍须核验配套 helper |
+| FR-17、18 | 可复现源码/构建、当前用户安装、完整清单与保留个人文件的卸载 | 历史 0.2.4 交付已存在；新 helper 与新发行包仍待统一验收 |
+| FR-19、21、22 | 有界日志、已验证版本与结构契约、签名更新/健康检查/回滚 | 候选适配须显式开启；无默认公共更新源，当前扩展尚未发布 |
+
+## 历史与完成条件
+
+0.2.4 已交付新版管理界面、图标、安装与卸载入口，并在当时的 Codex 26.1007.9446.0 / WE 2.8.0.42、受限播放集合下取得物理双窗和约 11 分钟循环证据。旧的无声内容门禁和既有窗口捕获记录可解释演进过程，不能否定现有私有启动能力，也不能为现有扩展提供全量通过结论。
+
+本机179项测试、六来源实机复验、3735.771秒资源检查及精确清理已取得证据，历史685秒FAIL与独立补验保留；发布工程另以新包清单、源码构建及隔离卸载核对。跨卷自绘Scene已有受限实机证明；全天、多物理显示器及任意第三方项目/引擎/GPU/文件系统兼容仍未证明。完整PRD不标完成，`fullPrdAccepted:false`保留。

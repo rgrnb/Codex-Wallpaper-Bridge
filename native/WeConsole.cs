@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using System.Diagnostics;
+using System.Threading;
 
 namespace CodexWallpaperBridge {
   // WE writes getWallpaper to CONOUT$, not its redirected stdout. ConPTY has no visible window.
@@ -26,6 +28,61 @@ namespace CodexWallpaperBridge {
     [DllImport("kernel32.dll")] static extern bool TerminateProcess(IntPtr handle, uint exitCode);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
     [DllImport("kernel32.dll")] static extern bool ReadFile(IntPtr handle, byte[] data, int size, out int read, IntPtr overlapped);
+    delegate bool VisitWindow(IntPtr window, IntPtr parameter);
+    [DllImport("user32.dll")] static extern bool EnumWindows(VisitWindow visitor, IntPtr parameter);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window,out uint pid);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr window,StringBuilder text,int size);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr window,StringBuilder text,int size);
+    [DllImport("user32.dll")] static extern bool PostMessage(IntPtr window,uint message,IntPtr wparam,IntPtr lparam);
+    static string WallpaperExecutable(string executable) {
+      if(!Path.IsPathRooted(executable)||!File.Exists(executable)||!Regex.IsMatch(Path.GetFileName(executable),"^wallpaper(32|64)\\.exe$",RegexOptions.IgnoreCase)||executable.IndexOf('"')>=0||executable.IndexOf('\n')>=0||executable.IndexOf('\r')>=0)throw new Exception("WE_EXECUTABLE_INVALID");
+      return Path.GetFullPath(executable);
+    }
+    static int Detached(string executable,string command) {
+      // Independent WE and the cleanup observer must survive the tray job.
+      // The observer has no control API token and only closes its exact HWND.
+      Environment.SetEnvironmentVariable("BRIDGE_CONTROL_TOKEN",null);
+      var startup=new StartupEx{startup=new Startup{cb=Marshal.SizeOf(typeof(Startup))}};ProcessInfo process;
+      if(!CreateProcess(executable,new StringBuilder("\""+executable+"\" "+command),IntPtr.Zero,IntPtr.Zero,false,0x09000200,IntPtr.Zero,Path.GetDirectoryName(executable),ref startup,out process))throw new Exception("NATIVE_BREAKAWAY_LAUNCH_FAILED");
+      CloseHandle(process.thread);CloseHandle(process.process);return (int)process.pid;
+    }
+    public static int StartWallpaperEngine(string executable) { return Detached(WallpaperExecutable(executable),"-silent"); }
+    public static int StartNativeLease(int owner,int wePid,string executable,string title) {
+      executable=WallpaperExecutable(executable);
+      if(!Regex.IsMatch(title,"^CodexBridgeNative-[a-f0-9-]{36}$"))throw new Exception("NATIVE_WINDOW_TITLE_INVALID");
+      var parents=ProcessMetrics.ParentMap();uint parent;
+      if(!parents.TryGetValue((uint)Process.GetCurrentProcess().Id,out parent)||parent!=owner)throw new Exception("NATIVE_LEASE_OWNER_INVALID");
+      long ownerStamp,weStamp;
+      using(var process=Process.GetProcessById(owner))ownerStamp=process.StartTime.ToUniversalTime().Ticks;
+      using(var process=Process.GetProcessById(wePid)) {
+        if(!String.Equals(Path.GetFullPath(process.MainModule.FileName),executable,StringComparison.OrdinalIgnoreCase))throw new Exception("NATIVE_LEASE_WE_INVALID");
+        weStamp=process.StartTime.ToUniversalTime().Ticks;
+      }
+      return Detached(Program.Executable,"--native-lease "+owner+" "+ownerStamp+" "+wePid+" "+weStamp+" \""+executable+"\" "+title);
+    }
+    public static void NativeLease(int owner,long ownerStamp,int wePid,long weStamp,string executable,string title) {
+      executable=WallpaperExecutable(executable);
+      if(!Regex.IsMatch(title,"^CodexBridgeNative-[a-f0-9-]{36}$"))throw new Exception("NATIVE_WINDOW_TITLE_INVALID");
+      Process source;try { source=Process.GetProcessById(wePid); }catch {return;}
+      using(source) {
+        if(source.StartTime.ToUniversalTime().Ticks!=weStamp||!String.Equals(Path.GetFullPath(source.MainModule.FileName),executable,StringComparison.OrdinalIgnoreCase))return;
+        Process controller=null;try{controller=Process.GetProcessById(owner);if(controller.StartTime.ToUniversalTime().Ticks!=ownerStamp){controller.Dispose();controller=null;}}catch { }
+        bool seen=false;DateTime expires=DateTime.UtcNow.AddSeconds(30);DateTime? cleanupDeadline=null;
+        try {
+          while(!source.HasExited) {
+            IntPtr owned=IntPtr.Zero;
+            EnumWindows(delegate(IntPtr window,IntPtr unused){uint pid;GetWindowThreadProcessId(window,out pid);if(pid!=wePid)return true;var text=new StringBuilder(512);GetWindowText(window,text,512);if(text.ToString()!=title)return true;GetClassName(window,text,512);if(text.ToString()=="WPEOverlappedWallpaper")owned=window;return true;},IntPtr.Zero);
+            if(owned!=IntPtr.Zero)seen=true;
+            if(controller==null||controller.HasExited) {
+              if(cleanupDeadline==null)cleanupDeadline=DateTime.UtcNow.AddSeconds(6);
+              if(owned!=IntPtr.Zero){PostMessage(owned,0x0010,IntPtr.Zero,IntPtr.Zero);Thread.Sleep(300);}
+              if((seen&&owned==IntPtr.Zero)||(owned==IntPtr.Zero&&DateTime.UtcNow>expires)||(owned!=IntPtr.Zero&&DateTime.UtcNow>cleanupDeadline.Value))return;
+            }else if(owned==IntPtr.Zero&&(seen||DateTime.UtcNow>expires))return;
+            Thread.Sleep(300);
+          }
+        }finally{if(controller!=null)controller.Dispose();}
+      }
+    }
     public static int StartCodex(string executable,string profile,int port) {
       if(!Native.CodexPath(executable) || port<1024 || port>65535)throw new Exception("CODEX_LAUNCH_ARGUMENT_INVALID");
       string configured=Environment.GetEnvironmentVariable("BRIDGE_DATA_DIR");

@@ -17,6 +17,13 @@ try {
     hashes.push(createHash('sha256').update(frame.jpeg).digest('hex')); await new Promise(r => setTimeout(r, 150));
   }
   assert.ok(new Set(hashes).size > 1);
+  // A fast producer must retain one unread snapshot instead of overwriting the
+  // shared image during a slow consumer's copy. Sequence belongs to the copied
+  // pixels, even if a newer frame is published while JPEG encoding completes.
+  const previous = await helper.capture({ ...surfaces[0], type: 'scene' }, { maxWidth: 640, jpegQuality: 70, fps: 120 });
+  await new Promise(r => setTimeout(r, 500));
+  const next = await helper.capture({ ...surfaces[0], type: 'scene' }, { maxWidth: 640, jpegQuality: 70, fps: 120 });
+  assert.equal(next.sequence - previous.sequence, 2, 'Only one unread frame may be published while the consumer waits.');
   const unloaded = async () => {
     for (let n = 0; n < 12; n++) {
       await new Promise(r => setTimeout(r, 250));

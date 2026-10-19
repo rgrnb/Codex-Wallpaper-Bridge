@@ -4,14 +4,14 @@ import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { DEFAULTS, validateSettings, effectivePolicy, SettingsStore } from '../src/config.mjs';
-import { selectedFromConfig, describeSource } from '../src/wallpaper-engine.mjs';
+import { selectedFromConfig, describeSource, WallpaperEngine } from '../src/wallpaper-engine.mjs';
 import { sanitize, Diagnostics } from '../src/diagnostics.mjs';
 import { validateTarget } from '../src/cdp.mjs';
 import { startControl } from '../src/control.mjs';
 
 test('settings reject corrupted/unknown input and preserve source when effects change (AT-14)', () => {
   assert.equal(validateSettings({}).enabled, false); assert.equal(validateSettings({}).startup, false);
-  for (const input of [{ fpsLimit: 0 }, { enabled: 1 }, { effects: { blur: -1 } }, { effects: { opacity: NaN } },
+  for (const input of [{ fpsLimit: 121 }, { enabled: 1 }, { effects: { blur: -1 } }, { effects: { opacity: NaN } },
     { performance: 'constructor' }, { schemaVersion: 2 }, { execute: 'anything' }, { effects: { extra: 1 } },
     { effects: [] }, JSON.parse('{"__proto__":{}}')])
     assert.throws(() => validateSettings(input));
@@ -26,6 +26,31 @@ test('all three profiles cap output, aggregate windows, pause and resume (AT-13/
   assert.equal(effectivePolicy(validateSettings({}), 1, true).autoAdjusted, true);
   const original = effectivePolicy(validateSettings({}), 1), adjusted = effectivePolicy(validateSettings({}), 4, true);
   for (const key of ['maxWidth', 'jpegQuality', 'pixelBudget']) assert.equal(adjusted[key], original[key], 'Automatic load adjustment must preserve visual quality.');
+});
+
+test('independent profiles and 120/automatic ceilings persist without changing source or desktop settings', async () => {
+  const s = validateSettings({ fpsLimit: 120, wallpaperProfiles: { fixture: { display: { zoom: 2, positionX: 0.2, positionY: 0.8 }, properties: { speed: 1.5 } } } });
+  assert.equal(effectivePolicy(s, 2).fps, 120);
+  assert.equal(effectivePolicy({ ...s, fpsLimit: 0 }, 2, false, 144).fps, 120);
+  assert.equal(effectivePolicy({ ...s, fpsLimit: 0 }, 2, true, 60).fps, 30);
+  for (const wallpaperProfiles of [{ fixture: { display: { zoom: 0.9 } } }, { fixture: { display: { positionX: 1.1 } } },
+    JSON.parse('{"__proto__":{"properties":{}}}'), { fixture: { properties: { speed: {} } } }])
+    assert.throws(() => validateSettings({ wallpaperProfiles }));
+  const root = await mkdtemp(path.join(os.tmpdir(), 'cwb-independent-'));
+  await writeFile(path.join(root, 'project.json'), JSON.stringify({ type: 'video', file: 'clip.mp4' }));
+  await writeFile(path.join(root, 'clip.mp4'), 'authored fixture');
+  let queries = 0;
+  const observer = new WallpaperEngine({ query: async () => { queries++; throw new Error('Desktop must never be queried'); } });
+  try {
+    assert.equal((await observer.observe({ running: true }, validateSettings({}))).source, null);
+    const settings = validateSettings({ selectedWallpaper: path.join(root, 'project.json') });
+    const first = await observer.observe(null, settings);
+    const second = await observer.observe({ running: true, pid: 99 }, { ...settings, monitor: 9 });
+    assert.equal(first.sourceMethod, 'independent-library'); assert.equal(first.source.fingerprint, second.source.fingerprint);
+    assert.equal(queries, 0);
+    const store = new SettingsStore(path.join(root, 'settings')); await store.load(); await store.save({ ...s, selectedWallpaper: settings.selectedWallpaper });
+    assert.deepEqual((await new SettingsStore(path.join(root, 'settings')).load()).wallpaperProfiles, s.wallpaperProfiles);
+  } finally { observer.close(); }
 });
 test('atomic settings persist and leave an earlier valid backup (AT-14)', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'cwb-settings-')), store = new SettingsStore(root);
@@ -77,4 +102,17 @@ test('control rejects unauthenticated requests and browser origins (AT-24/securi
   assert.equal((await fetch(`${base}/status`)).status, 403);
   assert.equal((await fetch(`${base}/status`, { headers: { 'X-Bridge-Token': token, Origin: 'https://untrusted.example' } })).status, 403);
   assert.equal((await fetch(`${base}/status`, { headers: { 'X-Bridge-Token': token } })).status, 200);
+});
+
+test('wallpaper mutations cannot race an installing update', async t => {
+  const token = 'b'.repeat(64); let actions = 0;
+  const server = await startControl({ token, coordinator: { updater: { status: 'Installing' } },
+    onSelect: async () => { actions++; }, onPreview: async () => { actions++; }, onWallpaperConfigure: async () => { actions++; } });
+  t.after(() => server.close());
+  for (const route of ['select', 'preview', 'configure']) {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/wallpaper/${route}`, { method: 'POST',
+      headers: { 'X-Bridge-Token': token, 'Content-Type': 'application/json' }, body: '{"id":"fixture"}' });
+    assert.equal(response.status, 400); assert.equal((await response.json()).error, 'UPDATE_IN_PROGRESS');
+  }
+  assert.equal(actions, 0);
 });

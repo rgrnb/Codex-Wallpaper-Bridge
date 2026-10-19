@@ -1,19 +1,19 @@
 {
   "schemaVersion": 1,
   "id": "owl-cdp-1",
-  "revision": 2,
+  "revision": 4,
   "candidateVersionPattern": "^26\\.(9[0-9]{2}|10[0-9]{2})\\.",
   "status": "Verified",
-  "verifiedVersions": ["26.1007.9446.0"],
+  "verifiedVersions": ["26.1007.9446.0", "26.1013.4894.0"],
   "evidence": "docs/ACCEPTANCE.md",
   "sourceReference": "CCDawn/Codex-Dynamic-Skin@5a0e74043b63ed9518ab37cdcf6865340a57006c",
   "targetPaths": ["/index.html", "/detached-window.html"],
   "selectors": {
     "root": "#root",
     "main": "main:is(.main-surface,[data-app-shell-main-surface],[class*=\"_MainContentSurface_\"])",
-    "sidebar": "aside.app-shell-left-panel",
+    "sidebar": "aside.app-shell-left-panel,.sidebar-navigation[data-slate-sidebar-content],[data-app-navigation-rail]",
     "header": "header:is(.app-header-tint,[data-app-shell-header-edge-scroll],[class*=\"_Header_\"])",
     "composer": ".composer-surface-chrome,[class*=\"_ComposerLayoutRoot_\"],[data-composer-surface-variant][data-composer-radius-variant]",
-    "surfaces": ".thread-scroll-container,[data-app-shell-main-content],[class*=\"_MainContent_\"],.app-shell-main-content-top-fade,[data-app-shell-main-content-top-fade]:empty"
+    "surfaces": ".thread-scroll-container,[data-app-shell-main-content],[class*=\"_MainContent_\"],.app-shell-main-content-top-fade,[data-app-shell-main-content-top-fade]:empty,[class*=\"_MainContentTopFade_\"],.thread-scroll-container [data-thread-scroll-footer] > .pointer-events-none.absolute:empty,.thread-scroll-container .pointer-events-none.sticky.bottom-0 > .pointer-events-none.absolute:empty"
   }
 }

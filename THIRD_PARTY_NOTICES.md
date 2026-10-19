@@ -14,6 +14,14 @@ The implementation is a separate Windows-only bridge, not a full copy of the ref
   Used by the D3D11 presentation bridge. Vendored source is in third_party/minhook;
   its full LICENSE.txt retains the MinHook BSD terms and HDE/component notices.
   No wallpaper resources or third-party Scene viewer are included.
+- Reviewed Sheep x86 input module: built with portable LLVM-MinGW 20260908 / LLVM 23.1.1,
+  https://github.com/mstorsjo/llvm-mingw/releases/tag/20260908.
+  The toolchain is build tooling and is not included in the application package.
+  Retained LLVM/possible compiler-rt notices are in `third_party/llvm-mingw/LLVM-LICENSE.txt`;
+  MinGW-w64 runtime and component notices accompany them. The upstream release's
+  build script pins MinGW-w64 commit `9f55f4a2d3b9783dab76d9808be3d6279b99ec2a`.
+  The compiled module imports Windows system Direct3D/User32/Kernel32/UCRT libraries;
+  it does not require a separately bundled LLVM runtime DLL.
 - .NET Framework, Windows WinRT/Direct3D and WinForms are operating-system prerequisites, not bundled application binaries.
 - Playwright is optional development tooling, not included in the application distribution.
 - No Codex binaries, Wallpaper Engine binaries, wallpaper project resources or user authentication data are distributed.

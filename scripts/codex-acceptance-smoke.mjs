@@ -37,7 +37,7 @@ const layout = `(() => Object.fromEntries(Object.entries(${JSON.stringify(adapte
 })))()`;
 let originalSource;
 try {
-  originalSource = (await observer.observe(before.wallpaperEngine, { monitor: 0 })).source;
+  originalSource = (await observer.observeDesktop(before.wallpaperEngine, { monitor: 0 })).source;
   assert.equal(originalSource.type, 'video', 'This acceptance slice requires the current Video source.');
   const endpoints = [];
   for (let index = 0; index < ports.length; index++) {
@@ -211,7 +211,7 @@ try {
     assert.ok([...presentation.windows.values()].includes(retained));
     await presentation.restore(); report.independentWindowClose = true; report.remainingWindowGenerationPreserved = true;
   }
-  const after = (await observer.observe(before.wallpaperEngine, { monitor: 0 })).source;
+  const after = (await observer.observeDesktop(before.wallpaperEngine, { monitor: 0 })).source;
   assert.equal(after.fingerprint, originalSource.fingerprint); report.wallpaperStateUnchanged = true;
   for (const app of before.codex) process.kill(app.pid, 0);
 } finally {

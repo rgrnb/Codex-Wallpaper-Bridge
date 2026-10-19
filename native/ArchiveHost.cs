@@ -37,7 +37,7 @@ static class ArchiveHost {
             string target = Path.Combine(root, n); Directory.CreateDirectory(Path.GetDirectoryName(target)); e.ExtractToFile(target);
           }
         }
-        File.WriteAllLines(Path.Combine(root, "installed-files.txt"), names.Concat(new[] { ".bridge-owned", "Uninstall.exe" }));
+        File.WriteAllLines(Path.Combine(root, "installed-files.txt"), names.Concat(new[] { ".bridge-owned", "Uninstall.exe" }).Distinct(StringComparer.OrdinalIgnoreCase));
         File.WriteAllText(Path.Combine(root, ".bridge-owned"), "CodexWallpaperBridge/1");
       }
       return 0;

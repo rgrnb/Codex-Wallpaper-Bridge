@@ -18,7 +18,7 @@ const signature = `(() => {const c=document.querySelector('canvas[data-cwb-owned
 
 export async function verifyLiveTypes({ presentation, clients, ports, root, report, focusTestWindow }) {
   const initial = await nativeProbe(), observer = new WallpaperEngine({ username: os.userInfo().username });
-  const previous = (await observer.observe(initial.wallpaperEngine, { monitor: 0 })).source; observer.close();
+  const previous = (await observer.observeDesktop(initial.wallpaperEngine, { monitor: 0 })).source; observer.close();
   const executable = initial.wallpaperEngine.path;
   const command = args => runFile(executable, args.map(quote), { windowsHide: true, windowsVerbatimArguments: true, timeout: 5000 });
   const appRoot = path.join(root, 'application-fixture'); await mkdir(appRoot);
@@ -73,7 +73,7 @@ export async function verifyLiveTypes({ presentation, clients, ports, root, repo
       `RAW~(${JSON.stringify(previous.properties)})~END`, quote('-monitor'), quote('0')], { windowsVerbatimArguments: true, windowsHide: true, timeout: 5000 });
     const restored = new WallpaperEngine({ username: os.userInfo().username });
     try {
-      const source = (await restored.observe((await nativeProbe()).wallpaperEngine, { monitor: 0 })).source;
+      const source = (await restored.observeDesktop((await nativeProbe()).wallpaperEngine, { monitor: 0 })).source;
       report.originalSourceAndPropertiesRestored = source.resource.toLowerCase() === previous.resource.toLowerCase() &&
         JSON.stringify(Object.entries(source.properties).sort()) === JSON.stringify(Object.entries(previous.properties).sort());
       assert.equal(report.originalSourceAndPropertiesRestored, true);

@@ -1,76 +1,116 @@
-# Architecture and engineering policy
+# Architecture — independent playback development
 
-PRD v1.0 governs requirements; the report and upstream provide technical reference. Verified support is scoped by application version, project and rendering interface.
+Current closeout: 186 tests/syntax and five actual-Codex failure/stop cases passed. Failed sources restore the original appearance; settings saves are serialized; termination timeout retains owned process/runtime identity and reports pending cleanup. See [closeout and unfinished scope](CLOSEOUT-0.3.0.zh-CN.md). The 179-test/endurance baseline below is historical evidence. Local scope is accepted; full PRD remains false.
+
+This document describes the unpublished 0.3.0 local candidate, updated 2026-10-19. 179 tests, syntax, physical six-source two-window playback/cleanup and normal/maximized/restored text-free composites passed. The 3735.771-second loop completed 24 source cycles and 351 samples, including nine Videos, four Sheep cycles and separate-volume Scene. Original resource gates passed; 42 workers exited, 36 runtimes were removed and all source/environment baselines were retained. Earlier 32-case/685-second records, failures and candidates remain historical evidence. Packages reuse the same eight tested native binaries with newly frozen production inputs; final package checks are in [closeout record](CLOSEOUT-0.3.0.zh-CN.md). `fullPrdAccepted:false` remains: one hour does not prove all-day, cross-monitor or arbitrary project/hardware compatibility.
+
+## Data flow and ownership
+
+The user's revised requirements replace desktop following with an independent Codex selection. Production selection never queries Monitor0 to choose a wallpaper. The library reads Steam registry/VDF roots, Workshop, local and built-in metadata and covers, including packed `scene.pkg` projects.
 
 ```text
-WinForms tray/settings -> authenticated loopback control -> Node coordinator
-  native process/TCP metadata -> Codex version + structural contract
-  WE ConPTY current-source query / selected config / watcher -> generation
-    Video: original File -> native Chromium decoder in each Codex window
-    Web: private muted Edge pipe -> shared in-memory image frames
-    Scene: exact existing D3D11 HWND -> bounded shared memory -> frames
-    Application: current WE-owned EXE/HWND -> WGC / exact-window pixels
-  one owned canvas/window -> centered Cover + background-only effects
-  failure -> remove owned layer -> bounded reconnect / compatibility wait
+WinForms manager -> authenticated loopback control -> Node coordinator
+  selected project + per-project display/properties -> source generation
+    Video -> original File -> muted Chromium decoder in each Codex renderer
+    Scene/native Web -> private, pre-muted WE -> shared captured image source
+    compatible Web -> isolated muted Edge + real host interfaces -> shared frames
+    reviewed Sheep -> owned application worker + private audio configuration
+    unknown engine/application -> explicit rejection
+  one canvas per Codex window -> Cover + zoom/position -> first-frame crossfade
+  generation/visibility/lease checks -> bounded recovery and owned cleanup
 ```
 
-## Boundaries
+The native host supplies manager/tray UI, process/window metadata and capture. CDP targets must belong to recognized official Codex processes and supported app page paths; version and structural contracts both apply. Auxiliary targets are skipped independently. Explicit connection-mode launch uses an independent Bridge profile without copying login data. No official installation files are modified, and no conversation or work-file contents are read.
 
-The native host provides settings, tray, process/window metadata and capture. No window titles, conversation text, authentication profiles or work-file contents are read. WE state comes from its CLI over ConPTY, with selected-user/monitor configuration fallback. A failed CLI backs off 30 seconds rather than being permanently disabled. Only current-project/config watchers and bounded polls run; there is no resource-library scan. Source fingerprints include current file stat, supported scalar properties and project revision. Credential-named properties are excluded; Web projects requiring them are rejected.
+The separate control API uses a random loopback port, a 256-bit token inherited through the parent environment, Origin rejection, host checks, a 16 KiB request limit and serialized mutations. Tokens are not persisted or logged. Private players receive an allowlisted OS environment rather than Bridge tokens, Node options or unrelated proxy/API settings.
 
-One monitor, default Monitor0, supplies every Codex window. The verified Scene path requires one unambiguous current renderer on Monitor0. Application windows require both exact selected executable identity and ancestry under current WE. An unrelated same-EXE process is excluded. Ambiguous sources fail safely.
+## Source isolation and audio
 
-CDP sockets must belong to recognized official Codex processes and exact app://-/index.html or detached-window.html page targets on the same loopback port. Version and structure checks both apply. Auxiliary pages are skipped independently. An explicit user action starts the installed official Codex with an independent Bridge profile/listener; existing Codex remains running and no login data is copied. Local CDP lacks per-client authentication; other code running as the same user remains a platform risk.
+### Source changes
 
-The separate Bridge API uses a random loopback port, 256-bit token inherited through the parent environment, Origin rejection, host checks, 16 KiB request limit and serial mutations. Tokens are never persisted or logged.
+`source-watch.mjs` establishes a whole-project metadata baseline before an observed source becomes available for staging. Recursive events are coalesced over 100 ms. Relative paths, object kinds, device/inode, mode, file size/mtimeNs and link targets determine material changes; ctime/link counts and directory timestamps do not. Creating or removing a private hardlink view therefore does not restart playback. The scan reads no media contents and does not traverse symbolic links. Steady observations reuse the baseline; failed watchers fall back to metadata polling at a three-second bound. Events arriving during a scan or source description remain pending/dirty. Source switches and close fence out late callbacks and scans.
 
-## Rendering and quality
+### Private Wallpaper Engine
 
-Presentation owns per-window connections; the page runtime owns one canvas, stylesheet, media and Blob URLs. The stylesheet changes contract-defined surface backgrounds only. Foreground fonts, layout, official styles, input handlers and focus remain under Codex control. One coordinate system spans sidebar/main/composer, with centered Cover.
+`src/isolated-player.mjs` and `native/IsolatedWallpaperHost.cs` own the Scene/native Web path. Only the reviewed WE 2.8.0.42 x64 executable hash is accepted. A private engine directory, configuration and WinForms host HWND are prepared before the suspended process resumes; `videoaudiooutput:false` is already set. Launch uses `-screensaver -host <HWND> -preview -silent`. Audio safety does not depend on detecting an audio session later or sending a global mute command.
 
-Production Video binds the authoritative current file to a **detached** Bridge file input object via CDP. Chromium streams its File-backed Blob URL through its native media decoder. No file copy, full-file Node transfer, transcode, HTTP CSP change or wallpaper script injection is involved. The detached input cannot emit events into Codex attachment handlers. Playback is muted before assigning src. requestVideoFrameCallback paces drawing with rAF fallback. The original source dimensions and display's physical pixels are retained up to a 16 MP safety bound in all modes. Each Codex renderer has its own native decoder; shared native decoding is not claimed. The old shared-Edge Video path remains diagnostic only.
+Each runtime has a unique token, marker and named kill-on-close Job. Process path, PID/creation time, Job membership and HWND identity constrain capture, input and termination. Private engine dependencies are staged separately from the desktop instance; wallpaper assets remain referenced at their original locations. Cleanup validates owned paths and markers, removes registered junction references first and never recursively traverses the original asset target.
 
-Web scripts execute only in a private incognito Edge context over inherited DevTools pipes, launched with mute-audio and an allowlisted OS environment. Root-contained capability URLs, no-store/range reads, disabled caches/downloads and bounded metadata prevent resource-library behavior. Supported scalar/general properties are forwarded. Unavailable WE-specific APIs produce explicit fallback.
+The local independent playback matrix passed all 29 Scene, two Web and one reviewed Sheep projects. The Scene cases produced 383 private cache files with changing frames and advancing GPU sequences. Original source contents, metadata and pre-existing caches were unchanged, and owned runtime directories were removed. Scene hardlinks always remain on the source volume: same-volume sources use the installed engine's private view base; separate-volume sources use `.bridge-scene-runtime/<token>` in the writable source parent. Canonical paths, complete manifests, token and device/inode identities fence staging and deletion; source directories are never linked and media is not copied. A D-volume engine/E-volume authored Scene passed real Codex two-window playback and both runtime cleanups. This finite evidence does not establish arbitrary filesystem/project/GPU compatibility.
 
-Scene captures only the current D3D11 swap chain's exact HWND. MinHook detours use bounded double staging/nonblocking readback and a 64 MiB map. BGRA/RGBA and FP16 linear-to-SDR are supported; HDR highlight fidelity is not claimed. Application uses WGC or exact-window PrintWindow for eligible existing windows. Scene/Application create no audio session and do not launch another wallpaper instance.
+No global WE wallpaper, mute, volume or pause command is used. The user's desktop process is not selected as the capture/input source or terminated as cleanup.
 
-Web/Scene/Application use the mode-specific JPEG/image budgets below. The smoothness update does not reduce these budgets or encoding quality. These paths are not described as lossless or HDR-equivalent.
+### Video
 
-## Lifecycle and recovery
+All background Video uses the original File-backed Codex Chromium decoder. CDP binds the selected file to a detached Bridge file input, so it cannot emit Codex attachment events. Playback is muted before assigning `src`. There is no full-file Node transfer, transcode, wallpaper script injection or JPEG frame replacement. Each Codex renderer has its own decoder; shared native Video decoding is not claimed. Original source dimensions and physical display pixels are retained up to the 16 MP safety bound.
 
-A monotonically increasing generation fences every load/frame. The old canvas stays visible until a prepared replacement commits. Each window/helper has at most one pending frame; no growing queue. Windows detach independently, including close races during discovery/configure/frame delivery. A lifecycle epoch prevents delayed attach after Restore.
+A separately requested WE preview must still pass its current private-engine startup checks. The older no-audio-track proof and playInWindow gate no longer define current background Video support.
 
-App absence is a waiting state. A source announced before its renderer receives a bounded 15-second discovery window. Failure removes owned layers and stops helpers, then retries at 2/4/8/16/32/60 seconds. After six attempts it waits for source/environment change or user action. Incompatible identities are fenced; user-disabled state survives reconnect.
+### Web
 
-Exit removes owned CSS/canvas/media. A crashed controller's page lease self-restores after about 15–18 seconds. Helpers/private browsers belong to a kill-on-close job; graphics hooks also self-unload on owner death. Explicit official Codex launch and updater have restricted breakaway lifecycles. No official files are rewritten, so restore cannot overwrite a newer official update.
+Native Web uses the private WE/CEF instance to retain native author interfaces. Loopback CDP connections are accepted only after the listener PID is proved to belong to the owned Job, including cached-input calls. The exact authored navigation, current frame/loader and connected document are checked. Same-document history routes are discovery candidates, not an identity bypass. Browser-backed navigation evidence is read in a private isolated world so author replacements in the default page world cannot forge the proof.
 
-## Defaults and limits
+The fallback runs project scripts in a private, muted Edge context over inherited DevTools pipes. Its host integration supplies real WASAPI stereo spectrum data and GSMTC metadata, cover, playback and timeline information. File/directory properties, random-file requests, directory changes, general FPS and pause/resume callbacks are implemented. Unsupported interfaces such as unimplemented queries report failure rather than fabricated data.
 
-These are engineering choices, including the user's latest visibility/smoothness feedback.
+Fallback resource access is confined to project roots and explicit property grants through capability URLs, bounded reads and disabled caches/downloads. An authored external default path does not grant access. The manager records file/directory paths only after explicit selection; the control layer validates existence and type when saving. Directory change and random-file callbacks use the authorized resource set.
 
-| Setting | Policy |
+### Reviewed application
+
+`src/silent-unity-application.mjs` and the owned application player accept only the reviewed built-in Sheep / Unity 2017.2.0f3 layout and content. Sheep contains audio effects. Before launch, a private 48,436-byte `globalgamemanagers` copy changes the reviewed audio-disable flag at offset 6424; original and patched bytes are hash-checked. Original authored files are not patched. Other code/data staging and hardlink/junction references remain subject to exact layout and cleanup validation.
+
+Dynamic pixels, startup mute and real interaction have now passed targeted Sheep acceptance. Scoped DPI-aware geometry/capture fixed the former crop: surface and capture are consistently 640×360. The final no-focus-hook run `da76f861` exercised five real clicks with visible new sheep and a 640-white-pixel increase, with the physical cursor and foreground unchanged; source, desktop configuration and owned cleanup checks all passed.
+
+The corrected-coordinate WM-only control `eba2ccd6` produced only 12 additional white pixels and no new sheep. Window mouse messages alone are insufficient for this reviewed Unity build: private cursor-poll virtualization is required. No focus hook or window-activation notification is used. This replaces the earlier unresolved DPI/focus hypotheses, but remains specific to the reviewed Sheep executable and input helpers. Unknown applications stay rejected. Unified-build dynamic/audio checks passed; physical Codex integration and endurance remain separate.
+
+## Pointer and rendering contracts
+
+The Codex runtime observes trusted pointer coordinates and left-button clicks without intercepting chat events. Cover, zoom and position are inverted into source coordinates. Keyboard, dragging and modifier gestures are excluded. Visibility, focus, source generation and the original receive timestamp fence input; stale queued events cannot regain a fresh lifetime.
+
+Scene input virtualization is limited to the token/Job/path-validated private engine. Targeted Scene tests prove move, down/release and repeated `cursorClick` edges; the reviewed WE polling behavior requires `GetKeyState(VK_LBUTTON)` to return `0xff80` while pressed. Native Web input uses the private CEF CDP endpoint. Neither path implements interaction by moving the system cursor or activating an unrelated window. Application input compatibility is tracked separately.
+
+Renderer runtime V5 owns one canvas, stylesheet, media and Blob URLs per window. Contract-defined sidebar/top/footer surfaces become transparent; composer surfaces, selected rows, foreground fonts, official layout and event handlers remain under Codex control. Prepared sources commit after a valid first frame and crossfade over 320 ms. Replaced/stale ImageBitmaps and crossfade backing canvases are released.
+
+Native frames use `frame-fetch.mjs`: a random target-local Fetch interception under an existing CSP-allowed static origin receives a JPEG through `Fetch.fulfillRequest`. Only the small frame ticket enters renderer JavaScript arguments. The handler never continues private requests to the service and never intercepts other app resources. Credentials, caching and redirects are excluded. Each single-use ticket is bounded to 4.5 MiB, the owned root frame/document, current generation and a five-second lifetime. The independent response proof is not part of the request URL or headers; an ordinary remote response after debugger loss cannot be accepted as a wallpaper frame. Wrong proofs cancel the response body before decoding. Invalidation, navigation and Restore revoke pending frames and interception. The page CSP and official installation remain unchanged.
+
+The earlier fixed-function JPEG argument path remains available to non-socket test fixtures. In the real current Codex, 1,200 authored-frame diagnostics measured approximately 56 MiB private growth for binary transport alone versus 1,357 MiB for large data arguments; full Blob/bitmap drawing measured 592 versus 2,674 MiB. These burst diagnostics are not a permanent-leak proof or integrated endurance acceptance. Forced-GC readings are retained separately and do not determine the normal-operation result.
+
+D3D11 uses the ABI v2/CWB2 shared map with an acknowledgement at byte 80: only one unread image may be outstanding, and its sequence identifies the copied pixels. Bounded staging/readback and reused buffers avoid an unbounded capture queue. BGRA/RGBA and FP16 linear-to-SDR conversion are supported; lossless or HDR-equivalent fidelity is not claimed. Native Web may use GDI pixels with sequence 0; acceptance must evaluate visible content rather than apply the Scene sequence rule to every backend.
+
+## Scheduling, defaults and recovery
+
+| Setting | Current policy |
 | --- | --- |
 | Initial background / startup | off / off; startup opt-in |
-| Wallpaper opacity | 0.60; 0–1 |
-| Blur / brightness / contrast | 0 px / 1 / 1; ranges 0–30 / 0.1–2 / 0.1–2 |
-| Performance / Balanced / Quality FPS | 30 / 60 / 60 ceilings |
-| User FPS ceiling | 1–60 |
+| Opacity / blur / brightness / contrast | 1 / 0 px / 1 / 1; saved values preserved |
+| UI FPS choices / default | 30, 60, 120, automatic / 60 |
+| Performance / balanced / quality ceilings | 30 / 120 / 120 |
 | Image width / JPEG quality | 960/65, 1280/78, 1920/88 |
-| Image canvas pixels | 921600 / 2073600 / 3686400 |
-| Native Video canvas | physical display pixels, 16 MP safety bound in every mode |
-| Auto adjustment | halve FPS under measured Bridge-tree CPU >0.25 core; keep pixel/encoding quality |
-| Multiple windows | no square-root FPS penalty; image capture shared |
-| Hidden windows | pause own video/canvas; continue source observation |
-| Discovery / observation | 5 s / 3 s; watcher wake after at least 500 ms |
-| Logs | active 1 MiB + four 1 MiB archives; identical-event suppression 30 s |
-| Metrics | Bridge-tree CPU/RSS/private bytes/handles; decoder counters and canvas FPS; GPU explicitly unavailable |
+| Image pixel budgets | 921600 / 2073600 / 3686400 |
+| Video | original File decoder; 16 MP canvas safety bound |
+| Auto adjustment | measured load can halve delivery FPS; spatial/encoding budgets stay fixed |
+| Windows | shared image source, independent Video decoders; no window-count-only FPS penalty |
+| Metrics | CPU/RSS/private bytes/handles, decoder and canvas counters; unavailable GPU metrics remain unavailable |
 
-FPS controls pace painting; native decoding may continue at source rate. Bridge-tree metrics exclude independent Codex cost; acceptance measures that tree separately.
+These are ceilings and budgets, not guaranteed throughput. Source identity includes size, preview mode and properties. Transient load throttling does not repeatedly restart a private engine at a different user ceiling. Each consumer has at most one pending frame.
 
-## Installation and updates
+Generations and lifecycle epochs fence start, capture, input and late attachment. Settings saves run in invocation order and block ticks until all queued saves finish. Stop revokes the lifecycle immediately, including loading workers. When all clients are hidden, owned Scene/Web/Application sources are released and later rebuilt; no desktop pause command is sent. Source failure restores the original Codex appearance and uses bounded 2/4/8/16/32/60-second retries, then waits for an environment/source change or user action. Termination timeout is an error: retain owned worker/session/runtime identities and retry cleanup only after confirming exit.
 
-The current-user installer bundles Node/native helpers, checks archive paths/limits/required files and ownership, stages activation, and creates standard shortcuts/uninstall registration. Startup and desktop shortcut are opt-in. Uninstall first restores appearance, then removes only inventoried product files. Unknown files/preferences/logs survive. Updates retain unknown files in the previous installation directory without opening/copying their contents.
+Exit removes owned page objects. A crashed controller's page lease restores appearance; private jobs/workers and identity-checked cleanup reclaim owned sources. Cleanup reports must distinguish released surface/session handles from retained workers and directories. A cleanup failure keeps the owned runtime identity available for retry; PID alone never authorizes process-tree termination.
 
-Settings are validated and atomically written with a prior valid copy. Physical AppData parents are resolved before rename for MSIX redirection. Installer/worker/launcher share an install lease. The stable launcher recovers interrupted swaps from its journal.
+## Manager, packaging and evidence
 
-Updates verify Ed25519 over exact UTF-8 payload, HTTPS same-origin archive URL, size/SHA-256 and validity dates. Automatic checks notify; archive download/install requires confirmation. The worker stages, swaps, restarts and health-checks. Failure restores the prior Bridge/settings and disables the background. Public release hosting/key selection remains an owner decision; no public feed is configured by default.
+The manager retains the existing navigation, cover grid, right-side properties and fixed actions. Its coordinate baseline is 96 DPI. Fixed performance choices establish their scaled width after initial autoscale; numeric slider values size to the text to prevent 144 DPI collapse/wrapping. File/directory editors require explicit selection and have read-only path displays.
+
+The final UI fixture passed 126 checks at virtualized 96 DPI and the single physical monitor's actual 144 DPI, including normal/minimum sizes and screen captures. Evidence is in `.local-evidence/ui-dpi-fix-2026-10-18T00-29-46-443Z/summary.json`. This covers manager/editor behavior, not API calls, file chooser dialogs, playback or physical Codex integration. UI fixtures must not overlap physical Codex window tests because they can change activation.
+
+The current-user installer, ownership inventory, stable launcher/install lease and atomic settings recovery remain. Uninstall restores appearance and removes inventoried product files while preserving personal data and unknown files. Updates verify Ed25519 payload signatures, HTTPS origin, hash/size and validity, then stage, health-check and roll back failures.
+
+The main build now calls `scripts/build-app-input.ps1`. The reviewed Sheep input path requires an i686 Windows MinGW-w64 GCC/Clang compiler, selected through `BRIDGE_I686_CC` or the standalone script's `-Compiler <absolute path>` parameter. The script validates `-dumpmachine` and does not download/install a compiler. It produces the managed `BridgeApplicationInput.dll` and native `BridgeApplicationInputHook32.dll`.
+
+The new 0.3.0 candidates reuse the exact eight validated native artifacts. The first archive audit matched all 186 source entries and 82 runtime entries, content hashes and four SHA sidecars. Production uninstall covers 15 added runtime files plus locked-file failure, self-removal, unknown/outside data preservation and repeat removal. Final same-input archive checks and the complete x64/x86 source build under a path with spaces are recorded in the development ledger. Earlier candidates and 0.2.4 artifacts are preserved; no public release has occurred. Public update hosting/signing identity is not configured by default.
+
+## Historical evidence
+
+0.2.4 delivered the manager, icon, installer/uninstaller and the then-supported playback paths. Its Codex 26.1007.9446.0 / WE 2.8.0.42 physical two-window and roughly eleven-minute endurance results remain in [acceptance records](ACCEPTANCE.zh-CN.md). They do not validate this expanded private-engine/application implementation or a newer Codex build.
+
+The 0.1 desktop-following/current-HWND capture and early 0.2 playInWindow/no-audio-content gates are historical engineering paths. They are not the current source-selection or audio-safety architecture. Only one physical display is available; cross-monitor DPI, all-day endurance and universal wallpaper/GPU support remain unclaimed.

@@ -12,7 +12,7 @@ import { projectServer } from '../src/web-backend.mjs';
 const before = await nativeProbe(), port = 19340, root = path.join(ROOT, '.local-evidence', `video-url-${randomBytes(8).toString('hex')}`);
 assert.ok(!before.codex.some(app => app.endpoints.includes(port))); await mkdir(root);
 const observer = new WallpaperEngine({ username: os.userInfo().username });
-const source = (await observer.observe(before.wallpaperEngine, { monitor: 0 })).source; observer.close(); assert.equal(source.type, 'video');
+const source = (await observer.observeDesktop(before.wallpaperEngine, { monitor: 0 })).source; observer.close(); assert.equal(source.type, 'video');
 const host = await projectServer(source.root, source.resource), report = { currentChatAccessed: false, wallpaperCopies: 0 };
 const child = spawn(before.codexInstall, ['--remote-debugging-address=127.0.0.1', `--remote-debugging-port=${port}`, `--user-data-dir=${root}`], { windowsHide: true, stdio: 'ignore' });
 let client;

@@ -7,7 +7,7 @@ import { nativeProbe, NativeFrames, runFile, ROOT } from '../src/platform.mjs';
 import { WallpaperEngine } from '../src/wallpaper-engine.mjs';
 const observer = new WallpaperEngine({ username: os.userInfo().username }), frames = new NativeFrames();
 const app = (await nativeProbe()).wallpaperEngine;
-const previous = (await observer.observe(app, { monitor: 0 })).source;
+const previous = (await observer.observeDesktop(app, { monitor: 0 })).source;
 const delay = ms => new Promise(r => setTimeout(r, ms));
 const quote = value => '"' + String(value).replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1') + '"';
 const command = args => runFile(app.path, args.map(quote), { windowsVerbatimArguments: true, windowsHide: true, timeout: 5000 });
@@ -40,7 +40,7 @@ try {
     [quote('-control'), quote('applyProperties'), quote('-properties'), `RAW~(${JSON.stringify(previous.properties)})~END`, quote('-monitor'), quote('0')],
     { windowsVerbatimArguments: true, windowsHide: true, timeout: 5000 });
   await delay(500);
-  const restored = (await observer.observe(app, { monitor: 0 })).source;
+  const restored = (await observer.observeDesktop(app, { monitor: 0 })).source;
   result.originalRestored = restored.resource.toLowerCase() === previous.resource.toLowerCase();
   observer.close();
   if (toggled) await toggleDesktop();

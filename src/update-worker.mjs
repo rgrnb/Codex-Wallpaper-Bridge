@@ -3,6 +3,7 @@ import { readFile, writeFile, rename, copyFile, lstat, realpath } from 'node:fs/
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
+import { constants } from 'node:fs';
 import path from 'node:path';
 const run = promisify(execFile), sleep = ms => new Promise(r => setTimeout(r, ms));
 const jobFile = process.argv[2];
@@ -50,7 +51,10 @@ try {
   await atomic(journal, record);
   await run(path.join(path.dirname(jobFile), 'BridgeArchive.exe'), [archive, stage, job.sha256], { windowsHide: true, timeout: 60000 });
   if (JSON.parse(await readFile(path.join(stage, 'package.json'), 'utf8')).version !== job.version) throw new Error('UPDATE_VERSION_MISMATCH');
-  await copyFile(path.join(target, 'Uninstall.exe'), path.join(stage, 'Uninstall.exe'));
+  // New packages ship a versioned uninstaller. Preserve it; only legacy
+  // archives without that entry inherit the previous install's tool.
+  await copyFile(path.join(target, 'Uninstall.exe'), path.join(stage, 'Uninstall.exe'), constants.COPYFILE_EXCL)
+    .catch(error => { if (error.code !== 'EEXIST') throw error; });
   // User-added files stay in the retained original directory. Do not open or
   // duplicate their contents while preparing a release. Rollback restores that
   // directory; uninstall removes only inventoried product files from backups.

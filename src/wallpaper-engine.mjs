@@ -3,6 +3,7 @@ import { watch } from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { runFile, queryCurrent } from './platform.mjs';
+import { SourceWatch } from './source-watch.mjs';
 
 export async function boundedJson(file, limit = 1024 * 1024) {
   const info = await stat(file);
@@ -36,11 +37,21 @@ export async function describeSource(file, resourceRevision = 0) {
   const full = await realpath(file), root = path.dirname(full);
   const metadataPath = path.join(root, 'project.json');
   const metadata = await boundedJson(metadataPath);
-  const type = String(metadata.type || ({ '.exe': 'application', '.mp4': 'video', '.webm': 'video', '.html': 'web', '.pkg': 'scene' })[path.extname(metadata.file || '').toLowerCase()] || '').toLowerCase();
+  const type = String(metadata.type || ({ '.exe': 'application', '.mp4': 'video', '.webm': 'video', '.html': 'web', '.pkg': 'scene', '.json': 'scene' })[path.extname(metadata.file || '').toLowerCase()] || '').toLowerCase();
   if (!['video', 'scene', 'web', 'application'].includes(type)) throw new Error('WE_TYPE_UNRECOGNIZED');
   if (typeof metadata.file !== 'string' || path.isAbsolute(metadata.file) || /[\x00-\x1f]/.test(metadata.file))
     throw new Error('WE_PROJECT_RESOURCE_INVALID');
-  const resource = await realpath(path.resolve(root, metadata.file));
+  const candidate = path.resolve(root, metadata.file), candidateRelative = path.relative(root, candidate);
+  if (!candidateRelative || candidateRelative === '..' || candidateRelative.startsWith(`..${path.sep}`) || path.isAbsolute(candidateRelative))
+    throw new Error('WE_RESOURCE_OUTSIDE_PROJECT');
+  let resource;
+  try { resource = await realpath(candidate); }
+  catch (error) {
+    // Published Workshop scenes retain file:scene.json in project.json, but
+    // ship their resources inside scene.pkg. Keep that original native entry.
+    if (type !== 'scene' || error.code !== 'ENOENT' || path.extname(metadata.file).toLowerCase() !== '.json') throw error;
+    resource = await realpath(path.join(root, 'scene.pkg'));
+  }
   const relative = path.relative(root, resource);
   if (!relative || relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative))
     throw new Error('WE_RESOURCE_OUTSIDE_PROJECT');
@@ -49,16 +60,59 @@ export async function describeSource(file, resourceRevision = 0) {
   const id = /^\d{1,20}$/.test(path.basename(root)) ? path.basename(root) : createHash('sha256').update(root).digest('hex').slice(0, 16);
   const fingerprint = createHash('sha256').update(JSON.stringify([id, type, resource, info.size, info.mtimeMs,
     projectInfo.mtimeMs, resourceRevision])).digest('hex');
-  return { id, type, resource, project: metadataPath, root, size: info.size, fingerprint,
+  return { id, type, resource, project: metadataPath, root, size: info.size, fingerprint, packed: type === 'scene' && path.extname(resource).toLowerCase() === '.pkg',
     stamp: `${info.size}:${info.mtimeMs}:${projectInfo.mtimeMs}` };
 }
 export class WallpaperEngine {
-  constructor({ username = '', run = runFile, query = run === runFile ? queryCurrent : null, clock = Date.now } = {}) {
+  constructor({ username = '', run = runFile, query = run === runFile ? queryCurrent : null, clock = Date.now,
+    describe = describeSource, watchOptions = {} } = {}) {
     this.username = username; this.run = run; this.watcher = null; this.configWatcher = null;
     this.resourceRevision = 0; this.watchedRoot = ''; this.configPath = ''; this.dirty = true; this.cliAvailable = null;
     this.query = query; this.clock = clock; this.cliRetryAt = 0;
+    this.describe = describe; this.watchOptions = watchOptions; this.observationEpoch = 0; this.dirtyEpoch = 0;
+  }
+  markDirty() { this.dirtyEpoch++; this.dirty = true; }
+  async watchSource(source) {
+    if (source.root !== this.watchedRoot) {
+      this.watcher?.close(); this.watchedRoot = source.root;
+      const epoch = this.observationEpoch;
+      const active = () => !this.closed && this.watchedRoot === source.root && this.watchEpoch === epoch;
+      this.watchEpoch = epoch;
+      this.watcher = new SourceWatch(source.root, { ...this.watchOptions, clock: this.clock,
+        changed: () => { if (active()) { this.resourceRevision++; this.markDirty(); } },
+        notified: () => { if (active()) this.markDirty(); }, failed: () => { if (active()) this.markDirty(); } });
+    }
+    // Establish the baseline before returning a source that can be staged.
+    await this.watcher.ready();
+  }
+  clearSourceWatch() {
+    this.watcher?.close(); this.watcher = null; this.watchedRoot = ''; this.watchEpoch = null;
   }
   async observe(app, settings) {
+    const epoch = ++this.observationEpoch;
+    if (this.closed) return { running: false };
+    // An empty selection is intentional. Production never consults desktop
+    // monitor preferences to choose a client wallpaper.
+    if (!settings.selectedWallpaper) { this.clearSourceWatch(); return { running: !!app?.running, sourceMethod: 'independent-library', source: null }; }
+    let source = await this.describe(settings.selectedWallpaper, this.resourceRevision);
+    if (this.closed || epoch !== this.observationEpoch) return { running: false };
+    await this.watchSource(source);
+    if (this.closed || epoch !== this.observationEpoch) return { running: false };
+    const revision = this.resourceRevision, dirtyEpoch = this.dirtyEpoch, watcher = this.watcher;
+    source = await this.describe(settings.selectedWallpaper, revision);
+    if (this.closed || epoch !== this.observationEpoch) return { running: false };
+    source.id = createHash('sha256').update(path.resolve(source.project).toLowerCase()).digest('hex').slice(0, 24);
+    const profile = settings.wallpaperProfiles?.[source.id] || {};
+    source.properties = { ...(profile.properties || {}) };
+    source.display = { zoom: 1, positionX: 0.5, positionY: 0.5, ...profile.display };
+    source.fingerprint = createHash('sha256').update(source.fingerprint + JSON.stringify(Object.entries(source.properties).sort(([a], [b]) => a.localeCompare(b)))).digest('hex');
+    this.dirty = this.dirtyEpoch !== dirtyEpoch || this.resourceRevision !== revision || watcher.pending;
+    return { running: !!app?.running, version: app?.version || 'unavailable', sourceMethod: 'independent-library', source };
+  }
+  // Read-only diagnostic compatibility for the previous acceptance tools.
+  // No production setting enables this desktop inspection route.
+  async observeDesktop(app, settings) {
+    const epoch = ++this.observationEpoch;
     if (this.closed) return { running: false };
     if (!app?.running) return { running: false };
     const executable = app.path;
@@ -69,8 +123,8 @@ export class WallpaperEngine {
     if (this.configPath !== configPath) {
       this.configWatcher?.close(); this.configPath = configPath;
       try { this.configWatcher = watch(path.dirname(configPath), (_, name) => {
-        if (String(name).toLowerCase() === 'config.json') this.dirty = true;
-      }); this.configWatcher.on('error', () => { this.dirty = true; }); } catch { /* polling remains */ }
+        if (!this.closed && this.configPath === configPath && String(name).toLowerCase() === 'config.json') this.markDirty();
+      }); this.configWatcher.on('error', () => { if (!this.closed && this.configPath === configPath) this.markDirty(); }); } catch { /* polling remains */ }
     }
     let selected, sourceMethod = 'cli';
     try { if (this.cliAvailable === false && this.clock() < this.cliRetryAt) throw new Error('WE_CLI_BACKOFF');
@@ -86,17 +140,17 @@ export class WallpaperEngine {
       sourceMethod = 'config-fallback';
       selected = selectedFromConfig(await boundedJson(configPath, 8 * 1024 * 1024), settings.monitor, this.username);
     }
-    const source = await describeSource(selected, this.resourceRevision);
+    let source = await this.describe(selected, this.resourceRevision);
+    if (this.closed || epoch !== this.observationEpoch) return { running: false };
+    await this.watchSource(source);
+    if (this.closed || epoch !== this.observationEpoch) return { running: false };
+    const revision = this.resourceRevision, dirtyEpoch = this.dirtyEpoch, watcher = this.watcher;
+    source = await this.describe(selected, revision);
     source.properties = propertiesFromConfig(await boundedJson(configPath, 8 * 1024 * 1024), source.resource, settings.monitor, this.username);
     source.fingerprint = createHash('sha256').update(source.fingerprint + JSON.stringify(Object.entries(source.properties).sort(([a], [b]) => a.localeCompare(b)))).digest('hex');
-    if (this.closed) return { running: false };
-    if (source.root !== this.watchedRoot) {
-      this.watcher?.close(); this.watchedRoot = source.root;
-      try { this.watcher = watch(source.root, { recursive: true }, () => { this.resourceRevision++; this.dirty = true; });
-        this.watcher.on('error', () => { this.dirty = true; }); } catch { /* metadata polling remains */ }
-    }
-    this.dirty = false;
+    if (this.closed || epoch !== this.observationEpoch) return { running: false };
+    this.dirty = this.dirtyEpoch !== dirtyEpoch || this.resourceRevision !== revision || watcher.pending;
     return { running: true, version: app.version || 'unavailable', sourceMethod, source };
   }
-  close() { this.closed = true; this.watcher?.close(); this.configWatcher?.close(); }
+  close() { this.closed = true; this.observationEpoch++; this.clearSourceWatch(); this.configWatcher?.close(); }
 }

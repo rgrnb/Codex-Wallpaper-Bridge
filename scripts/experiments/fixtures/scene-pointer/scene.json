@@ -1,0 +1,23 @@
+{
+  "camera": { "center": "0 0 -1", "eye": "0 0 0", "up": "0 1 0" },
+  "general": {
+    "ambientcolor": "1 1 1", "skylightcolor": "1 1 1", "bloom": false,
+    "clearenabled": true, "clearcolor": "0 0 0", "hdr": false,
+    "nearz": 0.01, "farz": 10000, "fov": 50, "zoom": 1,
+    "orthogonalprojection": { "width": 640, "height": 360 },
+    "cameraparallax": false, "camerashake": false, "norecompile": true
+  },
+  "objects": [{
+    "id": 1, "name": "Authored pointer hit surface", "image": "models/util/solidlayer.json",
+    "alignment": "center", "origin": "320 180 0", "angles": "0 0 0", "scale": "1 1 1",
+    "size": "640 360", "alpha": 1, "brightness": 1, "solid": true,
+    "color": {
+      "value": "0.1 0.1 0.1",
+      "script": "'use strict';\nlet previous = '';\nexport function update(value) {\n const p = input.cursorScreenPosition;\n if (input.cursorLeftDown) shared.cwbPolledDown = true;\n const key = [Math.round(p.x), Math.round(p.y), shared.cwbDown || 0, shared.cwbClicks || 0].join(',');\n if (key !== previous) { console.log('CWB_SCENE_POINTER', key, engine.screenResolution.x, engine.screenResolution.y); previous = key; }\n const r = Math.max(0, Math.min(1, p.x / engine.screenResolution.x));\n const g = Math.max(0, Math.min(1, p.y / engine.screenResolution.y));\n const b = 0.1 + (shared.cwbPolledDown ? 0.15 : 0) + 0.25 * ((shared.cwbDown || 0) % 2) + 0.45 * ((shared.cwbClicks || 0) % 2);\n return new Vec3(r, g, b);\n}\n"
+    },
+    "visible": {
+      "value": true,
+      "script": "'use strict';\nexport function update(value) { return true; }\nexport function cursorDown(event) { shared.cwbDown = (shared.cwbDown || 0) + 1; console.log('CWB_SCENE_DOWN', shared.cwbDown); }\nexport function cursorClick(event) { shared.cwbClicks = (shared.cwbClicks || 0) + 1; console.log('CWB_SCENE_CLICK', shared.cwbClicks); }\n"
+    }
+  }]
+}

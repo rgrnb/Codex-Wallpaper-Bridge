@@ -3,6 +3,7 @@
 .tools/
 .local-evidence/
 TASK_PROGRESS.md
+DEVELOPMENT_PROGRESS.md
 .vscode/
 .idea/
 .vs/
@@ -97,6 +98,11 @@ id_ed25519
 *.avi
 *.webm
 *.iso
+
+# Generated GPU and shader caches
+NVIDIA Corporation/
+**/shaders/blobs*/
+*.dxs
 
 # Operating-system metadata
 .DS_Store

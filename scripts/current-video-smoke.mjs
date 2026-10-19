@@ -8,7 +8,7 @@ import { WallpaperEngine } from '../src/wallpaper-engine.mjs';
 const { chromium } = await import(process.env.BRIDGE_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.BRIDGE_PLAYWRIGHT_MODULE).href : 'playwright');
 const observer = new WallpaperEngine({ username: os.userInfo().username });
 let source;
-try { source = (await observer.observe((await nativeProbe()).wallpaperEngine, { monitor: 0 })).source; }
+try { source = (await observer.observeDesktop((await nativeProbe()).wallpaperEngine, { monitor: 0 })).source; }
 finally { observer.close(); }
 assert.equal(source?.type, 'video');
 assert.ok(source.size <= 256 * 1024 * 1024);

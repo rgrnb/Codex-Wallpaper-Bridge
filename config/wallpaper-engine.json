@@ -4,9 +4,9 @@
   "automaticSceneVersions": ["2.8.0.42"],
   "sceneWindowClass": "WPEDesktopDX11Window",
   "sceneFormats": ["BGRA8", "RGBA8", "RGBA16_FLOAT-linear-to-SDR"],
-  "scope": "Windows x64; one unambiguous current Scene renderer on Monitor0",
+  "scope": "Windows x64; independently selected private WE Scene/Web and reviewed Sheep; per-project identity, audio and lifecycle checks",
   "projectChecksRequired": true,
   "fullFourTypeAcceptance": true,
   "evidence": "docs/ACCEPTANCE.md",
-  "acceptanceScope": "Dynamic tested projects in two official Codex 26.1007.9446.0 windows; per-project capability checks remain required"
+  "acceptanceScope": "Codex 26.1013.4894.0: physical two-window five-source playback, nine Videos and reviewed Scene/Web/Sheep switching over 685.553 seconds; exact-identity cleanup supplement and final-source rerun. Earlier 26.1007.9446.0 evidence is historical; per-project capability checks remain required."
 }

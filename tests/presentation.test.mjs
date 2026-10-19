@@ -45,13 +45,28 @@ test('a window closing during configure/frame or endpoint discovery cannot reset
   });
   for (const operation of ['configure', 'frame', 'invalidate']) {
     const p = make(); let liveCalls = 0;
-    p.windows.set('closed', { visible: true, client: { async evaluate() { throw new Error('CDP_CLOSED'); }, close() {} } });
-    p.windows.set('9338:live', { visible: true, generation: 7, client: { async evaluate() { liveCalls++; return true; }, close() { assert.fail('Live client must remain connected'); } } });
+    p.windows.set('closed', { visible: true, frameObjectId: 'closed', client: { async call() { throw new Error('CDP_CLOSED'); }, async evaluate() { throw new Error('CDP_CLOSED'); }, close() {} } });
+    p.windows.set('9338:live', { visible: true, generation: 7, frameObjectId: 'live', client: { async call() { liveCalls++; return { result: { value: true } }; }, async evaluate() { liveCalls++; return true; }, close() { assert.fail('Live client must remain connected'); } } });
     await p[operation](operation === 'configure' ? {} : operation === 'frame' ? { jpeg: 'owned-frame' } : 8, 8);
     assert.equal(p.windows.size, 1); assert.equal(liveCalls, 1);
     await p.reconcile([9336, 9338], '26.1007.1', false);
     assert.equal(p.windows.size, 1);
   }
+});
+
+test('native frame bytes remain CDP arguments rather than accumulating unique evaluated scripts', async () => {
+  const calls = [], p = new Presentation({}, { async event() {} });
+  const w = { visible: true, generation: 0, client: { async call(method, params) {
+    calls.push({ method, params }); return method === 'Runtime.evaluate' ? { result: { objectId: 'owned-global' } } : { result: { value: true } };
+  } } }; p.windows.set('owned', w);
+  for (const jpeg of ['first-frame-data', 'second-frame-data', 'third-frame-data']) await p.frame({ jpeg }, 12);
+  const scripts = calls.filter(call => call.method === 'Runtime.evaluate'); assert.equal(scripts.length, 1);
+  assert.equal(scripts[0].params.expression, 'globalThis');
+  const frames = calls.filter(call => call.method === 'Runtime.callFunctionOn'); assert.equal(frames.length, 3);
+  assert.equal(new Set(frames.map(call => call.params.functionDeclaration)).size, 1);
+  assert.ok(frames.every(call => !call.params.functionDeclaration.includes('frame-data') && call.params.objectId === 'owned-global'));
+  assert.deepEqual(frames.map(call => call.params.arguments[1].value), ['first-frame-data', 'second-frame-data', 'third-frame-data']);
+  assert.equal(w.generation, 12);
 });
 
 test('a hidden native video window defers loading without blocking visible window playback', async () => {

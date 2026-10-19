@@ -5,7 +5,8 @@ export async function readBody(request, limit = 16384) {
   for await (const chunk of request) { size += chunk.length; if (size > limit) throw new Error('REQUEST_TOO_LARGE'); chunks.push(chunk); }
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
 }
-export async function startControl({ token, coordinator, onExit, onExport, onStartup, onLaunch, onUpdateCheck, onUpdateInstall }) {
+export async function startControl({ token, coordinator, onExit, onExport, onStartup, onLaunch, onUpdateCheck, onUpdateInstall,
+  onLibrary, onLibraryRefresh, onSelect, onPreview, onPreviewClose, onWallpaperConfigure }) {
   const authorized = value => typeof value === 'string' && Buffer.byteLength(value) === Buffer.byteLength(token) &&
     timingSafeEqual(Buffer.from(value), Buffer.from(token));
   let mutating = false;
@@ -17,12 +18,25 @@ export async function startControl({ token, coordinator, onExit, onExport, onSta
     let locked = false;
     try {
       if (request.method === 'GET' && request.url === '/status') { response.end(JSON.stringify(coordinator.snapshot())); return; }
-      if (request.method !== 'POST' || !['/settings', '/restore', '/export', '/exit', '/launch', '/updates/check', '/updates/install', '/updates/configure'].includes(request.url)) {
+      const url = new URL(request.url, 'http://127.0.0.1');
+      if (request.method === 'GET' && url.pathname === '/library' && onLibrary) {
+        response.end(JSON.stringify(await onLibrary({ search: url.searchParams.get('search') || '', type: url.searchParams.get('type') || '' }))); return;
+      }
+      if (request.method !== 'POST' || !['/settings', '/restore', '/export', '/exit', '/launch', '/updates/check', '/updates/install', '/updates/configure',
+        '/library/refresh', '/wallpaper/select', '/wallpaper/preview', '/wallpaper/preview/close', '/wallpaper/configure'].includes(request.url)) {
         response.writeHead(404).end('{}'); return;
       }
       if (mutating) { response.writeHead(409).end(JSON.stringify({ error: 'ACTION_IN_PROGRESS' })); return; }
       mutating = locked = true;
-      const body = await readBody(request);
+      const body = await readBody(request, request.url === '/settings' ? 1024 * 1024 : 16384);
+      if (request.url.startsWith('/wallpaper/') || request.url === '/library/refresh') {
+        if (['/wallpaper/select', '/wallpaper/configure', '/wallpaper/preview'].includes(request.url) &&
+            ['Downloading', 'Installing'].includes(coordinator.updater?.status)) throw new Error('UPDATE_IN_PROGRESS');
+        const handler = { '/library/refresh': onLibraryRefresh, '/wallpaper/select': onSelect, '/wallpaper/preview': onPreview,
+          '/wallpaper/preview/close': onPreviewClose, '/wallpaper/configure': onWallpaperConfigure }[request.url];
+        if (!handler) throw new Error('ACTION_UNAVAILABLE');
+        const result = await handler(body); response.end(JSON.stringify({ ok: true, ...result })); return;
+      }
       if (request.url === '/settings') {
         if (['Downloading', 'Installing'].includes(coordinator.updater?.status)) throw new Error('UPDATE_IN_PROGRESS');
         const previous = coordinator.store.value;

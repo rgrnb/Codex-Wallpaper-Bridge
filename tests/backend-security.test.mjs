@@ -63,11 +63,11 @@ test('WE CLI failure backs off without becoming permanent after restart', async 
   } });
   const app = { running: true, path: path.join(root, 'wallpaper64.exe'), pid: 1 };
   try {
-    assert.equal((await observer.observe(app, { monitor: 0 })).sourceMethod, 'config-fallback');
-    now += 1000; fail = false; await observer.observe(app, { monitor: 0 }); assert.equal(calls, 1);
-    now += 30000; assert.equal((await observer.observe(app, { monitor: 0 })).sourceMethod, 'cli'); assert.equal(calls, 2);
-    fail = true; await observer.observe(app, { monitor: 0 }); fail = false;
-    assert.equal((await observer.observe({ ...app, pid: 2 }, { monitor: 0 })).sourceMethod, 'cli'); assert.equal(calls, 4);
+    assert.equal((await observer.observeDesktop(app, { monitor: 0 })).sourceMethod, 'config-fallback');
+    now += 1000; fail = false; await observer.observeDesktop(app, { monitor: 0 }); assert.equal(calls, 1);
+    now += 30000; assert.equal((await observer.observeDesktop(app, { monitor: 0 })).sourceMethod, 'cli'); assert.equal(calls, 2);
+    fail = true; await observer.observeDesktop(app, { monitor: 0 }); fail = false;
+    assert.equal((await observer.observeDesktop({ ...app, pid: 2 }, { monitor: 0 })).sourceMethod, 'cli'); assert.equal(calls, 4);
   } finally { observer.close(); }
 });
 

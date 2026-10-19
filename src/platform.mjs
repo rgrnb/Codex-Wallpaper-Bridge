@@ -46,18 +46,27 @@ export class NativeFrames {
     child.on('error', () => { if (this.child === child) this.stop(); });
     child.on('exit', () => { if (this.child === child) this.stop(); });
   }
-  capture(surface, policy) {
+  request(message, timeout = 3000) {
     if (this.pending) return Promise.reject(new Error('FRAME_BACKPRESSURE'));
     this.start();
     return new Promise((resolve, reject) => {
-      const graphics = surface.type === 'scene';
-      const timer = setTimeout(() => this.stop(), graphics ? 12000 : 3000);
+      const timer = setTimeout(() => this.stop(), timeout);
       this.pending = { resolve, reject, timer };
-      this.child.stdin.write(JSON.stringify({ hwnd: surface.hwnd, pid: surface.pid,
+      this.child.stdin.write(JSON.stringify(message) + '\n', error => { if (error) this.stop(); });
+    });
+  }
+  capture(surface, policy) {
+    const graphics = surface.type === 'scene';
+    return this.request({ hwnd: surface.hwnd, pid: surface.pid,
+        ...(surface.nativeTitle ? { nativeTitle: surface.nativeTitle } : {}),
         ...(surface.sourceFile ? { sourceFile: surface.sourceFile } : {}),
         ...(surface.wePid ? { wePid: surface.wePid } : {}), ...(surface.fixtureOwnerPid ? { fixtureOwnerPid: surface.fixtureOwnerPid } : {}),
-        graphics, fps: policy.fps || 15, maxWidth: policy.maxWidth, quality: policy.jpegQuality }) + '\n', error => { if (error) this.stop(); });
-    });
+        ...(surface.isolated ? { isolated: surface.isolated } : {}),
+        graphics, fps: policy.fps || 15, maxWidth: policy.maxWidth, quality: policy.jpegQuality }, graphics ? 12000 : 3000);
+  }
+  pointer(surface, event) {
+    return this.request({ action: 'pointer', hwnd: surface.hwnd, pid: surface.pid, isolated: surface.isolated,
+      x: event.x, y: event.y, click: event.type === 'click' });
   }
   stop() {
     const p = this.pending; this.pending = null;

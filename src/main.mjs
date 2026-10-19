@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { readFile, mkdir, open, unlink, realpath } from 'node:fs/promises';
+import { readFile, mkdir, open, unlink, realpath, access, stat } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { ROOT, HOST, nativeProbe, NativeFrames, startupRegistration, runFile } from './platform.mjs';
@@ -12,12 +12,15 @@ import { startControl } from './control.mjs';
 import { UpdateManager } from './updates.mjs';
 import { WebBackend } from './web-backend.mjs';
 import { ProcessSampler } from './metrics.mjs';
+import { WallpaperLibrary } from './library.mjs';
+import { IsolatedPlayer, inspectIsolatedSource } from './isolated-player.mjs';
+import { IndependentApplicationPlayer, inspectApplicationAudio } from './independent-application.mjs';
 
 if (process.argv.includes('--probe')) {
   const apps = await nativeProbe();
   const wallpaper = new WallpaperEngine({ username: os.userInfo().username });
   let source;
-  try { source = await wallpaper.observe(apps.wallpaperEngine, { monitor: 0 }); }
+  try { source = await wallpaper.observeDesktop(apps.wallpaperEngine, { monitor: 0 }); }
   finally { wallpaper.close(); }
   console.log(JSON.stringify({ ...apps, wallpaper: source ? { running: source.running, sourceMethod: source.sourceMethod,
     id: source.source?.id, type: source.source?.type, bytes: source.source?.size } : null }, null, 2));
@@ -44,9 +47,30 @@ if (process.argv.includes('--probe')) {
     await store.save({ ...store.value, startup: initialApps.startupEnabled });
   const adapter = JSON.parse(await readFile(path.join(ROOT, 'config', 'adapter.json'), 'utf8'));
   const capabilities = JSON.parse(await readFile(path.join(ROOT, 'config', 'wallpaper-engine.json'), 'utf8'));
+  const library = new WallpaperLibrary();
+  await library.refresh({ executable: initialApps.wallpaperEngine?.path || store.value.wallpaperEnginePath });
+  const annotateLibrary = async () => {
+    for (const item of library.items) {
+      const safety = item.type === 'application' ? await inspectApplicationAudio(item) : await inspectIsolatedSource(item, enginePath);
+      item.nativePlayback = { state: safety.safe ? 'verified' : 'unavailable', ...safety };
+    }
+  };
+  const findEngine = async () => {
+    if (initialApps.wallpaperEngine?.path) return initialApps.wallpaperEngine.path;
+    if (store.value.wallpaperEnginePath) return store.value.wallpaperEnginePath;
+    for (const directory of library.installations) for (const name of ['wallpaper64.exe', 'wallpaper32.exe']) {
+      const file = path.join(directory, name); if (await access(file).then(() => true, () => false)) return file;
+    }
+    return '';
+  };
+  const enginePath = await findEngine();
+  await annotateLibrary();
+  const player = new IsolatedPlayer({ executable: enginePath });
+  const preview = new IsolatedPlayer({ executable: enginePath });
+  const application = new IndependentApplicationPlayer(), applicationPreview = new IndependentApplicationPlayer();
   const coordinator = new Coordinator({ settings: store, log, probe: nativeProbe, capabilities,
     wallpaper: new WallpaperEngine({ username: os.userInfo().username }),
-    presentation: new Presentation(adapter, log), frames: new NativeFrames(), web: new WebBackend(), processSampler: new ProcessSampler() });
+    presentation: new Presentation(adapter, log), frames: new NativeFrames(), web: new WebBackend(), player, application, processSampler: new ProcessSampler() });
   coordinator.apps = initialApps; coordinator.lastProbe = Date.now();
   const version = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8')).version;
   coordinator.version = version;
@@ -64,10 +88,54 @@ if (process.argv.includes('--probe')) {
   async function exit() {
     if (exiting) return; exiting = true; clearInterval(interval); clearInterval(updateTimer);
     const hard = setTimeout(() => process.exit(1), 8000); hard.unref();
-    await coordinator.stop(); server.close(); await lock.close(); await unlink(lockPath).catch(() => {});
+    await preview.stop(); await applicationPreview.stop(); await coordinator.stop(); server.close(); await lock.close(); await unlink(lockPath).catch(() => {});
     process.exit(0);
   }
   const server = await startControl({ token, coordinator, onExit: exit,
+    onLibrary: filters => ({ items: library.list(filters).map(item => ({ ...item,
+      backend: item.type === 'video' ? 'chromium-muted-video' : item.nativePlayback?.safe ? item.type === 'application' ? application.backend : 'wallpaper-engine-isolated' : item.type === 'web' ? 'isolated-muted-web' : 'unavailable',
+      properties: Object.entries(item.properties).map(([key, property]) => ({ ...property, key, label: property.text,
+        value: store.value.wallpaperProfiles[item.id]?.properties?.[key] ?? property.value })) })),
+      errors: library.errors, refreshedAt: library.refreshedAt, installations: library.installations }),
+    onLibraryRefresh: async () => { await library.refresh({ executable: coordinator.apps?.wallpaperEngine?.path || player.executable }); await annotateLibrary(); return { count: library.items.length }; },
+    onSelect: async ({ id }) => {
+      const item = library.get(id); if (!item) throw new Error('LIBRARY_ITEM_NOT_FOUND');
+      if (item.type === 'application') { const safety = await application.inspect(item); if (!safety.safe) throw new Error(safety.code); }
+      if (item.type === 'scene') { const safety = await player.inspect(item); if (!safety.safe) throw new Error(safety.code); }
+      await coordinator.applySettings({ ...store.value, selectedWallpaper: item.project, enabled: true });
+      return { id: item.id };
+    },
+    onPreview: async ({ id }) => {
+      const source = await library.source(id, store.value.wallpaperProfiles[id]?.properties);
+      // A user may have closed the native preview using its own title bar.
+      // Never reuse its cached HWND when they explicitly request another preview.
+      await preview.stop();
+      await applicationPreview.stop();
+      const selectedPreview = source.type === 'application' ? applicationPreview : preview;
+      await selectedPreview.start(source, { properties: source.properties, preview: true }); return { id, backend: selectedPreview.backend };
+    },
+    onPreviewClose: async () => { await preview.stop(); await applicationPreview.stop(); },
+    onWallpaperConfigure: async ({ id, display, properties }) => {
+      const item = library.get(id); if (!item) throw new Error('LIBRARY_ITEM_NOT_FOUND');
+      const values = structuredClone(properties || store.value.wallpaperProfiles[id]?.properties || {});
+      for (const [key, value] of Object.entries(values)) {
+        const definition = item.properties[key];
+        if (!definition || typeof value !== typeof definition.value ||
+          (definition.type === 'slider' && (value < (definition.min ?? -1e6) || value > (definition.max ?? 1e6))) ||
+          (definition.type === 'combo' && !definition.options.some(option => option.value === value))) throw new Error('WALLPAPER_PROPERTY_UNSUPPORTED');
+        if (['file', 'directory'].includes(definition.type) && value) {
+          let selected;
+          try { selected = await realpath(path.isAbsolute(value) ? value : path.resolve(item.root, value)); }
+          catch { throw new Error('WEB_PROPERTY_FILE_UNAVAILABLE'); }
+          const info = await stat(selected);
+          if (definition.type === 'file' ? !info.isFile() : !info.isDirectory()) throw new Error('WEB_PROPERTY_FILE_UNAVAILABLE');
+          values[key] = selected.replaceAll('\\', '/');
+        }
+      }
+      await coordinator.applySettings({ ...store.value, wallpaperProfiles: { ...store.value.wallpaperProfiles,
+        [id]: { display: display || store.value.wallpaperProfiles[id]?.display, properties: values } } });
+      return { id };
+    },
     onStartup: startupRegistration,
     onExport: () => log.export(path.join(data, 'diagnostics.json'), coordinator.snapshot()),
     onUpdateCheck: () => coordinator.updater.check(version, true),
@@ -96,7 +164,7 @@ if (process.argv.includes('--probe')) {
       try { process.kill(Number(process.env.BRIDGE_PARENT_PID), 0); } catch { void exit(); return; }
     }
     void coordinator.tick();
-  }, 50);
+  }, 4);
   // The capability token is never sent to stdout or persisted. Native host provides it via environment.
   console.log(JSON.stringify({ ready: true, port: server.address().port, version }));
   if (!process.env.BRIDGE_CONTROL_TOKEN) console.error('Headless mode: use the native tray application for settings.');
